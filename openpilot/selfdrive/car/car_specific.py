@@ -250,7 +250,10 @@ class CarSpecificEvents:
       # Disable on rising and falling edge of cancel for both stock and OP long
       # TODO: only check the cancel button with openpilot longitudinal on all brands to match panda safety
       if b.type == ButtonType.cancel and (allow_button_cancel or not self.CP.pcmCruise) and not (
-          self.CP.brand == "hyundai" and self.cruise_main_button_mode == 1):
+          self.CP.brand == "hyundai" and
+          self.CP.openpilotLongitudinalControl and
+          not self.CP.pcmCruise and
+          self.cruise_main_button_mode == 1):
         events.add(EventName.buttonCancel)
         if CS.gearShifter == GearShifter.park and not self.do_shutdown:
           self.do_shutdown = True

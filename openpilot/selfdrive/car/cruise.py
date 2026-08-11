@@ -248,8 +248,14 @@ class VCruiseCarrot:
       #self.event = event
       self._log_timer = self._log_timeout
 
+  def _oem_cruise_main_mode_enabled(self):
+    return (self.CP.brand == "hyundai" and
+            self.CP.openpilotLongitudinalControl and
+            not self.CP.pcmCruise and
+            self._cruise_main_button_mode == 1)
+
   def queue_main_cruise_short(self):
-    if self.CP.brand == "hyundai" and self._cruise_main_button_mode == 1:
+    if self._oem_cruise_main_mode_enabled():
       self._main_short_press_pending = True
 
   def _current_speed_for_initial_resume(self):
@@ -350,7 +356,7 @@ class VCruiseCarrot:
 
     if self._main_short_press_pending:
       self._main_short_press_pending = False
-      if self.CP.brand == "hyundai" and self._cruise_main_button_mode == 1:
+      if self._oem_cruise_main_mode_enabled():
         if CS.cruiseState.available:
           # MAIN OFF->ON: start a fresh cruise session at current vehicle speed.
           v_cruise_kph = self._current_speed_for_initial_resume()
@@ -564,7 +570,7 @@ class VCruiseCarrot:
       if button_type == ButtonType.accelCruise:
         self._lat_enabled = True
         self._pause_auto_speed_up = False
-        if self._cruise_main_button_mode == 1 and not CC.enabled and CS.cruiseState.available:
+        if self._oem_cruise_main_mode_enabled() and not CC.enabled and CS.cruiseState.available:
           # OEM-style RES/+ while paused: replace the remembered target with
           # current speed, then engage.
           v_cruise_kph = self._current_speed_for_initial_resume()
@@ -572,6 +578,7 @@ class VCruiseCarrot:
           self._v_cruise_kph_at_brake = 0
           self._cruise_cancel_state = False
           self.carrot_cruise_active = False
+          self._lat_enabled = True
           self._activate_cruise = 1
           self._add_log(f"{v_cruise_kph} RES engage from current speed")
         elif self._soft_hold_active > 0:
@@ -651,7 +658,7 @@ class VCruiseCarrot:
         print("lfaButton")
       elif button_type == ButtonType.cancel:
         self._paddle_decel_active = False
-        if self._cruise_main_button_mode == 1:
+        if self._oem_cruise_main_mode_enabled():
           # Newer Hyundai/Kia exposes the center pause/resume switch as CANCEL=4.
           # Keep the target speed and only toggle longitudinal engagement.
           self._cruise_cancel_state = False
@@ -660,6 +667,8 @@ class VCruiseCarrot:
           elif CC.enabled:
             self._activate_cruise = -1
             self._add_log(f"{v_cruise_kph} Cruise pause, set speed kept")
+          elif not self._cruise_speed_initialized:
+            self._add_log("Cruise resume ignored: no set speed")
           else:
             self._lat_enabled = True
             self._activate_cruise = 1
@@ -685,7 +694,7 @@ class VCruiseCarrot:
         self.useLaneLineSpeedApply = useLaneLineSpeed if self.useLaneLineSpeedApply == 0 else 0
 
       elif button_type == ButtonType.cancel:
-        if self._cruise_main_button_mode != 1:
+        if not self._oem_cruise_main_mode_enabled():
           self._cruise_cancel_state = True
           self._lat_enabled = False
           self._paddle_decel_active = False
