@@ -570,7 +570,9 @@ class VCruiseCarrot:
       if button_type == ButtonType.accelCruise:
         self._lat_enabled = True
         self._pause_auto_speed_up = False
-        if self._oem_cruise_main_mode_enabled() and not CC.enabled and CS.cruiseState.available:
+        if self._soft_hold_active > 0:
+          self._soft_hold_active = 0
+        elif self._oem_cruise_main_mode_enabled() and not CC.enabled and CS.cruiseState.available:
           # OEM-style RES/+ while paused: replace the remembered target with
           # current speed, then engage.
           v_cruise_kph = self._current_speed_for_initial_resume()
@@ -581,8 +583,6 @@ class VCruiseCarrot:
           self._lat_enabled = True
           self._activate_cruise = 1
           self._add_log(f"{v_cruise_kph} RES engage from current speed")
-        elif self._soft_hold_active > 0:
-          self._soft_hold_active = 0
         elif self.carrot_cruise_active:
           self._v_cruise_kph_at_brake = 0
         elif self._cruise_ready or not CC.enabled or CS.cruiseState.standstill:
