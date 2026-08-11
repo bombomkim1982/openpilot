@@ -52,6 +52,7 @@
               "zh": "按钮模式",
               "params": [
                 "CruiseButtonMode",
+                "CruiseMainButtonMode",
                 "CancelButtonMode",
                 "LfaButtonMode",
                 "PaddleMode"
@@ -1461,6 +1462,22 @@
       "cdescr": "0: 常规, 1: 用户1, 2: 用户2, 3: 用户3 (使用速度表)",
       "min": 0,
       "max": 3,
+      "default": 0,
+      "unit": 1
+    },
+    {
+      "group": "버튼설정",
+      "name": "CruiseMainButtonMode",
+      "title": "순정형 크루즈 메인버튼(0)",
+      "descr": "0:당근 기본동작\n1:순정형 메인버튼\nMAIN 짧게: OFF→현재속도로 SET+Engage, ON→전체 OFF+설정속도 초기화\n중앙버튼: 설정속도 유지 Engage/Disengage\nRES/+: Disengage 상태에서 현재속도로 재설정 후 Engage\nMAIN 2초 길게: 기존 OpenpilotEnabledToggle 유지",
+      "egroup": "BUTN",
+      "etitle": "OEM Cruise Main Button Mode(0)",
+      "edescr": "0:Carrot default\n1:OEM-style MAIN short press; center click pause/resume; RES/+ sets current speed when disengaged; MAIN 2s long press unchanged",
+      "cgroup": "按键设置",
+      "ctitle": "原厂巡航主按钮模式(0)",
+      "cdescr": "0:Carrot默认\n1:原厂式主巡航按钮",
+      "min": 0,
+      "max": 1,
       "default": 0,
       "unit": 1
     },

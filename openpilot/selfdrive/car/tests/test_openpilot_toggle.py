@@ -26,6 +26,7 @@ class TestCruiseMainOpenpilotToggle(unittest.TestCase):
 
     self.assertFalse(toggle.update([button_event(True)], engaged=False, now=1.0))
     self.assertFalse(toggle.update([button_event(False)], engaged=False, now=1.5))
+    self.assertTrue(toggle.short_pressed)
 
   def test_long_press_is_blocked_while_engaged(self):
     toggle = CruiseMainOpenpilotToggle(MAIN_BUTTON)
@@ -33,6 +34,7 @@ class TestCruiseMainOpenpilotToggle(unittest.TestCase):
     self.assertFalse(toggle.update([button_event(True)], engaged=True, now=1.0))
     self.assertFalse(toggle.update([], engaged=True, now=1.1 + CRUISE_MAIN_LONG_PRESS_SECONDS))
     self.assertFalse(toggle.update([button_event(False)], engaged=True, now=10.0))
+    self.assertFalse(toggle.short_pressed)
 
   def test_other_buttons_are_ignored(self):
     toggle = CruiseMainOpenpilotToggle(MAIN_BUTTON)

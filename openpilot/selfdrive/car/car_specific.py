@@ -51,11 +51,13 @@ class CarSpecificEvents:
     self.vCruise_prev = 250
     self.carrotCruise_prev = False
     self.tesla_lkas_button_prev = False
+    self.cruise_main_button_mode = 0
 
   def update_params(self):
     if self.frame % 100 == 0:
       self.mute_seatbelt = self.params.get_bool("MuteSeatbelt")
       self.mute_door = self.params.get_bool("MuteDoor")
+      self.cruise_main_button_mode = self.params.get_int("CruiseMainButtonMode")
 
   def update(self, CS: car.CarState, CS_prev: car.CarState, CC: car.CarControl):
     self.frame += 1
@@ -247,7 +249,8 @@ class CarSpecificEvents:
     for b in CS.buttonEvents:
       # Disable on rising and falling edge of cancel for both stock and OP long
       # TODO: only check the cancel button with openpilot longitudinal on all brands to match panda safety
-      if b.type == ButtonType.cancel and (allow_button_cancel or not self.CP.pcmCruise):
+      if b.type == ButtonType.cancel and (allow_button_cancel or not self.CP.pcmCruise) and not (
+          self.CP.brand == "hyundai" and self.cruise_main_button_mode == 1):
         events.add(EventName.buttonCancel)
         if CS.gearShifter == GearShifter.park and not self.do_shutdown:
           self.do_shutdown = True

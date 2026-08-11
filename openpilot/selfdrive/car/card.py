@@ -275,7 +275,14 @@ class Car:
   def step(self):
     CS, RD = self.state_update()
 
-    if self.cruise_main_toggle.update(CS.buttonEvents, self.sm['carControl'].enabled):
+    main_long_press = self.cruise_main_toggle.update(CS.buttonEvents, self.sm['carControl'].enabled)
+    if self.cruise_main_toggle.short_pressed:
+      # state_update() already ran for this CAN cycle. Queue the short click so
+      # VCruiseCarrot handles it on the next cycle, after Hyundai main_enabled
+      # has propagated into cruiseState.available.
+      self.v_cruise_helper.queue_main_cruise_short()
+
+    if main_long_press:
       if self.CI.CC is not None and not self.CP.dashcamOnly:
         openpilot_enabled = not self.params.get_bool("OpenpilotEnabledToggle")
         cloudlog.warning(f"Cruise MAIN long press: setting OpenpilotEnabledToggle to {openpilot_enabled}")

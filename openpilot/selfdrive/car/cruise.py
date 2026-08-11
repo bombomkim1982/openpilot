@@ -174,9 +174,11 @@ class VCruiseCarrot:
     self._cruise_speed_unit = 10
     self._cruise_speed_unit_basic = 1
     self._cruise_button_mode = 2
+    self._cruise_main_button_mode = 0
     self._cancel_button_mode = 0
     self._lfa_button_mode = 0
     self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
+    self._main_short_press_pending = False
 
     self._gas_pressed_count = 0
     self._gas_pressed_count_last = 0
@@ -246,6 +248,10 @@ class VCruiseCarrot:
       #self.event = event
       self._log_timer = self._log_timeout
 
+  def queue_main_cruise_short(self):
+    if self.CP.brand == "hyundai" and self._cruise_main_button_mode == 1:
+      self._main_short_press_pending = True
+
   def _current_speed_for_initial_resume(self):
     return max(self.v_ego_kph_set, self._cruise_speed_min)
 
@@ -271,6 +277,7 @@ class VCruiseCarrot:
       self._cruise_speed_unit_basic = self.params.get_int("CruiseSpeedUnitBasic")
       self._paddle_mode = self.params.get_int("PaddleMode")
       self._cruise_button_mode = self.params.get_int("CruiseButtonMode")
+      self._cruise_main_button_mode = self.params.get_int("CruiseMainButtonMode")
       self._cancel_button_mode = self.params.get_int("CancelButtonMode")
       self._lfa_button_mode = self.params.get_int("LfaButtonMode")
       self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
@@ -340,6 +347,32 @@ class VCruiseCarrot:
     if CC.enabled:
       self._cruise_ready = False
     v_cruise_kph = self._update_cruise_buttons(CS, CC, self.v_cruise_kph)
+
+    if self._main_short_press_pending:
+      self._main_short_press_pending = False
+      if self.CP.brand == "hyundai" and self._cruise_main_button_mode == 1:
+        if CS.cruiseState.available:
+          # MAIN OFF->ON: start a fresh cruise session at current vehicle speed.
+          v_cruise_kph = self._current_speed_for_initial_resume()
+          self._cruise_speed_initialized = True
+          self._v_cruise_kph_at_brake = 0
+          self._cruise_cancel_state = False
+          self._cruise_ready = False
+          self.carrot_cruise_active = False
+          self._lat_enabled = True
+          if not CC.enabled:
+            self._activate_cruise = 1
+          self._add_log(f"{v_cruise_kph} Main cruise ON, set current speed")
+        else:
+          # MAIN ON->OFF: end the whole cruise session and forget its set speed.
+          if CC.enabled:
+            self._activate_cruise = -1
+          self._cruise_speed_initialized = False
+          self._v_cruise_kph_at_brake = 0
+          self._cruise_ready = False
+          self._cruise_cancel_state = False
+          self.carrot_cruise_active = False
+          self._add_log("Main cruise OFF, set speed erased")
 
     if self._activate_cruise > 0:
       #self.events.append(EventName.buttonEnable)
@@ -531,7 +564,17 @@ class VCruiseCarrot:
       if button_type == ButtonType.accelCruise:
         self._lat_enabled = True
         self._pause_auto_speed_up = False
-        if self._soft_hold_active > 0:
+        if self._cruise_main_button_mode == 1 and not CC.enabled and CS.cruiseState.available:
+          # OEM-style RES/+ while paused: replace the remembered target with
+          # current speed, then engage.
+          v_cruise_kph = self._current_speed_for_initial_resume()
+          self._cruise_speed_initialized = True
+          self._v_cruise_kph_at_brake = 0
+          self._cruise_cancel_state = False
+          self.carrot_cruise_active = False
+          self._activate_cruise = 1
+          self._add_log(f"{v_cruise_kph} RES engage from current speed")
+        elif self._soft_hold_active > 0:
           self._soft_hold_active = 0
         elif self.carrot_cruise_active:
           self._v_cruise_kph_at_brake = 0
@@ -608,10 +651,24 @@ class VCruiseCarrot:
         print("lfaButton")
       elif button_type == ButtonType.cancel:
         self._paddle_decel_active = False
-        if self._cancel_button_mode in [1]:
-          self._lat_enabled = False
-          self._add_log("Lateral " + "enabled" if self._lat_enabled else "disabled")
-        self._cruise_cancel_state = True
+        if self._cruise_main_button_mode == 1:
+          # Newer Hyundai/Kia exposes the center pause/resume switch as CANCEL=4.
+          # Keep the target speed and only toggle longitudinal engagement.
+          self._cruise_cancel_state = False
+          if not CS.cruiseState.available:
+            self._add_log("Cruise center click ignored: MAIN is OFF")
+          elif CC.enabled:
+            self._activate_cruise = -1
+            self._add_log(f"{v_cruise_kph} Cruise pause, set speed kept")
+          else:
+            self._lat_enabled = True
+            self._activate_cruise = 1
+            self._add_log(f"{v_cruise_kph} Cruise resume, set speed kept")
+        else:
+          if self._cancel_button_mode in [1]:
+            self._lat_enabled = False
+            self._add_log("Lateral " + "enabled" if self._lat_enabled else "disabled")
+          self._cruise_cancel_state = True
         #self._v_cruise_kph_at_brake = 0
     else:
       if button_type == ButtonType.accelCruise:
@@ -628,11 +685,12 @@ class VCruiseCarrot:
         self.useLaneLineSpeedApply = useLaneLineSpeed if self.useLaneLineSpeedApply == 0 else 0
 
       elif button_type == ButtonType.cancel:
-        self._cruise_cancel_state = True
-        self._lat_enabled = False
-        self._paddle_decel_active = False
-        #self.params.put_bool_nonblocking("ExperimentalMode", not self.params.get_bool("ExperimentalMode"))
-        self._add_log("Lateral " + "enabled" if self._lat_enabled else "disabled")
+        if self._cruise_main_button_mode != 1:
+          self._cruise_cancel_state = True
+          self._lat_enabled = False
+          self._paddle_decel_active = False
+          #self.params.put_bool_nonblocking("ExperimentalMode", not self.params.get_bool("ExperimentalMode"))
+          self._add_log("Lateral " + "enabled" if self._lat_enabled else "disabled")
 
     if self._paddle_mode > 0 and button_type in [ButtonType.paddleLeft, ButtonType.paddleRight]:  # paddle button
       if self._paddle_mode == 3:
